@@ -56,16 +56,17 @@ function ensureMigrated() {
           if (Array.isArray(local.sets) && local.sets.length && !syncHas.setIndex) await writeSetsToSync(local.sets);
           await LOCAL.set({ syncMigrated: true });
         }
-        // v1.14.1 repack: sets that v1.14.0 parked in local storage for
-        // size are rewritten into sync storage in chunks, so they sync.
-        const { syncRepack141 } = await LOCAL.get("syncRepack141");
-        if (!syncRepack141) {
+        // Repack (v1.14.1, re-run by v1.14.2 with favicon sanitizing):
+        // sets parked in local storage for size are rewritten into sync
+        // storage in chunks, so they sync.
+        const { syncRepack142 } = await LOCAL.get("syncRepack142");
+        if (!syncRepack142) {
           const { setIndex } = await SYNC.get("setIndex");
           if (Array.isArray(setIndex) && setIndex.some((e) => e.local)) {
             const all = await readAllSetsRaw();
             if (all.length) await writeSetsToSync(all);
           }
-          await LOCAL.set({ syncRepack141: true });
+          await LOCAL.set({ syncRepack142: true });
         }
       } catch { /* sync storage unavailable: getters still read sync area, which behaves like local when sync is off */ }
     })();
@@ -117,10 +118,28 @@ export async function saveSettings(patch) {
   await SYNC.set({ settings: { ...cur, ...patch } });
 }
 
+// Some sites hand out favicons as data: URLs, which can be several KB
+// each and bloat a set past every sync limit (one real 12-tab set was
+// 35 KB, a single tab 7.4 KB). For syncing, swap a data: favicon for
+// the small web favicon for the same site. Titles, URLs and pinned
+// flags are never touched.
+function sanitizeSetForSync(s) {
+  const tabs = (s.tabs || []).map((t) => {
+    if (t.favIconUrl && t.favIconUrl.startsWith("data:")) {
+      let fav = "";
+      try { fav = "https://www.google.com/s2/favicons?domain=" + new URL(t.url).hostname + "&sz=64"; } catch { fav = ""; }
+      return { ...t, favIconUrl: fav };
+    }
+    return t;
+  });
+  return { ...s, tabs };
+}
+
 // Plan the sync items for one set. A set that fits in one item is stored
 // whole. A bigger set is split: a head item with every field except the
 // tabs, plus one item per chunk of tabs. Returns null when even a single
-// tab cannot fit an item (not expected in real use).
+// tab cannot fit an item (a safety net; with favicons sanitized this
+// should not happen in real use).
 function planSetItems(s) {
   const headKey = "set:" + s.id;
   if (byteSize(headKey, s) <= ITEM_SAFE) return [{ key: headKey, value: s }];
@@ -157,15 +176,16 @@ async function writeSetsToSync(sets) {
   const plannedKeys = new Set();
   let used = otherBytes;
   for (const s of sets) {
-    const items = planSetItems(s);
+    const clean = sanitizeSetForSync(s);
+    const items = planSetItems(clean);
     const total = items ? items.reduce((n, it) => n + byteSize(it.key, it.value), 0) : Infinity;
     if (items && used + total <= SYNC_SOFT_CAP) {
       for (const it of items) { writes[it.key] = it.value; plannedKeys.add(it.key); }
       used += total;
-      newIndex.push({ id: s.id, chunks: items.length - 1 });
+      newIndex.push({ id: clean.id, chunks: items.length - 1 });
     } else {
-      newLocal[s.id] = s;
-      newIndex.push({ id: s.id, local: true });
+      newLocal[clean.id] = clean;
+      newIndex.push({ id: clean.id, local: true });
     }
   }
   const removals = [];
