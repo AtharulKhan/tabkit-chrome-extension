@@ -142,10 +142,18 @@ async function saveRename() {
   msg(title || selectedFavicon ? "Saved for this page. Name and icon stick on reload." : "Rename cleared.");
 }
 
+let emojiSaveTimer = null;
 $("favicon-emoji").oninput = () => {
   const v = $("favicon-emoji").value.trim();
   selectedFavicon = v ? { kind: "emoji", value: v } : null;
   paintEmojiGrid();
+  // Custom emoji typed or pasted here saves on its own, like a grid tap.
+  clearTimeout(emojiSaveTimer);
+  if (v) emojiSaveTimer = setTimeout(saveRename, 450);
+};
+$("favicon-emoji").onchange = () => {
+  clearTimeout(emojiSaveTimer);
+  if (selectedFavicon) saveRename();
 };
 
 $("favicon-none").onclick = async () => {
