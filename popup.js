@@ -1,4 +1,4 @@
-import { getSets, hostOf } from "./store.js";
+import { getSets, getSettings, saveSettings, hostOf } from "./store.js";
 
 const $ = (id) => document.getElementById(id);
 const msg = (t) => { $("msg").textContent = t || ""; };
@@ -68,18 +68,45 @@ async function refreshStats() {
   $("slept-today").textContent = `${n} put to sleep today`;
 }
 
+let setQuery = "";
+
+function setMatches(set) {
+  if (!setQuery) return true;
+  if (set.name.toLowerCase().includes(setQuery)) return true;
+  return set.tabs.some((t) => (t.title || "").toLowerCase().includes(setQuery) || (t.url || "").toLowerCase().includes(setQuery));
+}
+
 async function refreshSets() {
-  const sets = await getSets();
+  const allSets = await getSets();
   const wrap = $("sets");
   wrap.innerHTML = "";
-  if (!sets.length) {
+  if (!allSets.length) {
     wrap.innerHTML = '<div class="muted" style="padding:2px 0 6px">No sets yet. Arrange a window, name it below, and save it. Sets you save show up here, one click to open.</div>';
     return;
   }
+  const settings = await getSettings();
+  const pins = settings.pinnedSetIds || [];
+  const shown = allSets.filter(setMatches);
+  if (!shown.length) {
+    wrap.innerHTML = '<div class="muted" style="padding:2px 0 6px">No sets match your search.</div>';
+    return;
+  }
+  const pinRank = (s) => { const i = pins.indexOf(s.id); return i === -1 ? 999 : i; };
+  const sets = [...shown].sort((a, b) => pinRank(a) - pinRank(b));
   const win = await chrome.windows.getLastFocused();
   const cur = await chrome.runtime.sendMessage({ type: "window-set", windowId: win.id }).catch(() => null);
   const currentSetId = cur && cur.setId;
+  let lastGroup = null;
   for (const set of sets) {
+    const isPinnedSet = pins.includes(set.id);
+    const group = isPinnedSet ? "Pinned" : "All sets";
+    if ((pins.length && sets.some((s) => !pins.includes(s.id))) && group !== lastGroup) {
+      const label = document.createElement("div");
+      label.className = "group-label";
+      label.textContent = group;
+      wrap.appendChild(label);
+      lastGroup = group;
+    }
     const pinned = set.tabs.filter((t) => t.pinned).length;
     const card = document.createElement("div");
     card.className = "card set-card";
@@ -96,6 +123,18 @@ async function refreshSets() {
       badge.textContent = "Open in this window";
       top.appendChild(badge);
     }
+    const pinBtn = document.createElement("button");
+    pinBtn.className = "pin-btn" + (isPinnedSet ? " on" : "");
+    pinBtn.textContent = isPinnedSet ? "📌 Pinned" : "📌 Pin";
+    pinBtn.title = isPinnedSet ? "Unpin from the top of the popup" : "Pin to the top of the popup for quick access";
+    pinBtn.onclick = async () => {
+      const s2 = await getSettings();
+      const cur2 = s2.pinnedSetIds || [];
+      const next = cur2.includes(set.id) ? cur2.filter((x) => x !== set.id) : [...cur2, set.id];
+      await saveSettings({ pinnedSetIds: next });
+      refreshSets();
+    };
+    top.appendChild(pinBtn);
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = `${set.tabs.length} tabs · ${pinned} pinned`;
@@ -154,6 +193,8 @@ async function refreshSets() {
     wrap.appendChild(card);
   }
 }
+
+$("set-search").oninput = () => { setQuery = $("set-search").value.trim().toLowerCase(); refreshSets(); };
 
 $("open-options").onclick = () => chrome.runtime.openOptionsPage();
 $("see-all-sets").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("sets.html") });

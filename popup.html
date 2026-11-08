@@ -11,7 +11,12 @@
   .stat-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
   .stat-line .big { font-size: 15px; font-weight: 650; }
   .section-title { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; font-weight: 650; }
-  .set-card { margin-bottom: 8px; padding: 11px 12px; }
+  .set-card { margin-bottom: 7px; padding: 9px 11px; }
+  #sets { max-height: 336px; overflow-y: auto; padding-right: 2px; }
+  .group-label { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 650; margin: 8px 0 5px; }
+  .group-label:first-child { margin-top: 0; }
+  .pin-btn { background: none; border: none; box-shadow: none; cursor: pointer; font-size: 12px; padding: 2px 4px; color: var(--muted); }
+  .pin-btn.on { color: var(--accent); font-weight: 650; }
   .set-card .name { font-size: 14.5px; font-weight: 650; }
   .set-card .meta { color: var(--muted); font-size: 12px; margin-top: 1px; }
   .favicons { display: flex; gap: 3px; margin-top: 7px; flex-wrap: wrap; }
@@ -48,6 +53,7 @@
   <div class="bar"><div id="bar" style="width:0%"></div></div>
 
   <div class="section-title">Tab sets</div>
+  <input type="text" id="set-search" placeholder="Search sets" style="margin-bottom:8px">
   <div id="switch-prompt" class="card" style="display:none; margin-bottom:10px; padding:11px 12px"></div>
   <div id="sets"></div>
   <button class="link-btn" id="see-all-sets" style="margin-top:2px">See all sets, searchable →</button>

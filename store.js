@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS = {
   sleepOnOpen: true,             // tabs opened from a set start asleep
   exceptions: [],                // domain substrings never put to sleep
   startupSetId: null,            // set opened (pinned part) at browser startup
+  pinnedSetIds: [],              // sets pinned to the top of the popup for quick access
 };
 
 export async function getSettings() {

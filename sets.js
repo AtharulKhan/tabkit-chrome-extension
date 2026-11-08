@@ -64,7 +64,9 @@ async function render() {
   const settings = await getSettings();
   const wrap = $("sets");
   wrap.innerHTML = "";
-  const shown = sets.filter(matches);
+  const pins = settings.pinnedSetIds || [];
+  const pinRank = (s) => { const i = pins.indexOf(s.id); return i === -1 ? 999 : i; };
+  const shown = sets.filter(matches).sort((a, b) => pinRank(a) - pinRank(b));
   $("count").textContent = sets.length
     ? (query ? `${shown.length} of ${sets.length} sets match` : `${sets.length} set${sets.length === 1 ? "" : "s"}`)
     : "";
@@ -88,7 +90,7 @@ async function render() {
     const top = document.createElement("div");
     top.className = "row spread";
     const h = document.createElement("h2");
-    h.textContent = set.name;
+    h.textContent = (pins.includes(set.id) ? "📌 " : "") + set.name;
     top.appendChild(h);
     if (set.id === currentSetId) {
       const badge = document.createElement("span");
@@ -182,7 +184,17 @@ async function render() {
       msg(`Deleted "${set.name}".`);
       render();
     };
-    actions.append(open, newWin, upd, star, rename, del);
+    const pin = document.createElement("button");
+    pin.className = "small";
+    pin.textContent = pins.includes(set.id) ? "Unpin from popup" : "Pin in popup";
+    pin.onclick = async () => {
+      const cur2 = (await getSettings()).pinnedSetIds || [];
+      const next = cur2.includes(set.id) ? cur2.filter((x) => x !== set.id) : [...cur2, set.id];
+      await saveSettings({ pinnedSetIds: next });
+      msg(next.includes(set.id) ? `"${set.name}" pinned to the top of the popup.` : `"${set.name}" unpinned.`);
+      render();
+    };
+    actions.append(open, newWin, upd, star, pin, rename, del);
     card.append(top, meta, list, actions);
     wrap.appendChild(card);
   }
