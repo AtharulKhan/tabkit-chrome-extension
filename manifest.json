@@ -68,7 +68,7 @@
     "history",
     "bookmarks"
   ],
-  "version": "1.13.0",
+  "version": "1.14.0",
   "web_accessible_resources": [
     {
       "matches": [
@@ -84,5 +84,6 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtdQ75nO57M8m74o6dysQ1qeiTXKEKBXdfrnHPCrPh/DD5Vd7sFP4r2a5TPL+UAWJN4zszHcElIMjauMWWTzfXGNSKptmb3isTa8acZCmwf2pxwNeZZcSIa72KiU5UuMnA5r3/pxJIlwZ0okoKakMLdeqheCtytyGzD24MWa7E0PQEqK+Hm4EVTz/+YG0raaAAcpegqiLhgABigeveHJBvrKc4rgf6EzJQQV/8x0mmGQq0kldoB5DUV4wpaIuNPxXbgdlMP14GuIS1c4a7+ObTKZal/WxUXr2MihT5XyeTvZSf65nVuQjvcorKRXlGnEjm2bz1rijyJVogtIObbUE/wIDAQAB"
 }

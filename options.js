@@ -149,15 +149,14 @@ $("save-all").onclick = async () => {
 };
 
 $("export-btn").onclick = async () => {
-  const data = await chrome.storage.local.get(["settings", "sets", "renames", "quickTabs"]);
   const backup = {
     app: "TabKit",
     backupVersion: 1,
     exportedAt: new Date().toISOString(),
-    settings: data.settings || {},
-    sets: data.sets || [],
-    renames: data.renames || [],
-    quickTabs: data.quickTabs || [],
+    settings: await getSettings(),
+    sets: await getSets(),
+    renames: await getRenames(),
+    quickTabs: await getQuickTabs(),
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const a = document.createElement("a");

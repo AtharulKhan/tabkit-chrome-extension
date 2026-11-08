@@ -13,36 +13,171 @@ export const DEFAULT_SETTINGS = {
   pinnedSetIds: [],              // sets pinned to the top of the popup for quick access
 };
 
+// ---- Where the data lives (v1.14.0) ----
+// Settings, rename rules, quick tabs, and tab sets live in
+// chrome.storage.sync, so they follow the user's Google sign-in to every
+// Chrome profile that runs TabKit under the same pinned extension ID
+// (the "key" field in manifest.json). Stats stay in chrome.storage.local:
+// they change too often for sync write limits and gain nothing by syncing.
+// Sync limits that shape the layout: about 100 KB total, 8 KB per item.
+//   settings             -> one item
+//   renames, quickTabs   -> chunked arrays (base, base#1, ... plus base$n)
+//   setIndex             -> [{ id, local }] one entry per set
+//   set:<id>             -> one set per item
+// A set that is too big for one sync item, or saved when sync storage is
+// nearly full, falls back to chrome.storage.local (localSets) and is
+// flagged local:true in the index, so it still works on that machine.
+const SYNC = chrome.storage.sync;
+const LOCAL = chrome.storage.local;
+const ITEM_SAFE = 7000;    // stay under the 8192 per-item cap
+const SYNC_SOFT_CAP = 94000; // stay under the 102400 total cap
+
+function byteSize(key, value) {
+  return key.length + JSON.stringify(value).length;
+}
+
+// One-time copy of pre-v1.14 data from local storage into sync storage.
+// Only fills keys that sync does not have yet, so two machines upgrading
+// do not fight: the first one's data wins, the second keeps its local
+// copy untouched as a backup.
+let migratePromise = null;
+function ensureMigrated() {
+  if (!migratePromise) {
+    migratePromise = (async () => {
+      try {
+        const { syncMigrated } = await LOCAL.get("syncMigrated");
+        if (syncMigrated) return;
+        const local = await LOCAL.get(["settings", "sets", "renames", "quickTabs"]);
+        const syncHas = await SYNC.get(["settings", "setIndex", "renames", "quickTabs"]);
+        if (local.settings && !syncHas.settings) await SYNC.set({ settings: local.settings });
+        if (Array.isArray(local.renames) && local.renames.length && !syncHas.renames) await writeChunked("renames", local.renames);
+        if (Array.isArray(local.quickTabs) && local.quickTabs.length && !syncHas.quickTabs) await writeChunked("quickTabs", local.quickTabs);
+        if (Array.isArray(local.sets) && local.sets.length && !syncHas.setIndex) await writeSetsToSync(local.sets);
+        await LOCAL.set({ syncMigrated: true });
+      } catch { /* sync storage unavailable: getters still read sync area, which behaves like local when sync is off */ }
+    })();
+  }
+  return migratePromise;
+}
+
+// Chunked arrays for values that can outgrow one sync item.
+async function writeChunked(base, arr) {
+  const chunks = [];
+  let cur = [];
+  for (const item of arr) {
+    const trial = [...cur, item];
+    if (cur.length && byteSize(base, trial) > ITEM_SAFE) { chunks.push(cur); cur = [item]; }
+    else cur = trial;
+  }
+  if (cur.length || !chunks.length) chunks.push(cur);
+  const countKey = base + "$n";
+  const prev = await SYNC.get(countKey);
+  const prevCount = prev[countKey] || 1;
+  const out = { [countKey]: chunks.length };
+  chunks.forEach((c, i) => { out[i === 0 ? base : `${base}#${i}`] = c; });
+  await SYNC.set(out);
+  const stale = [];
+  for (let i = chunks.length; i < prevCount; i++) stale.push(`${base}#${i}`);
+  if (stale.length) await SYNC.remove(stale);
+}
+async function readChunked(base) {
+  const countKey = base + "$n";
+  const head = await SYNC.get([base, countKey]);
+  const count = head[countKey] || 1;
+  let items = Array.isArray(head[base]) ? [...head[base]] : [];
+  if (count > 1) {
+    const keys = [];
+    for (let i = 1; i < count; i++) keys.push(`${base}#${i}`);
+    const rest = await SYNC.get(keys);
+    for (const k of keys) if (Array.isArray(rest[k])) items = items.concat(rest[k]);
+  }
+  return items;
+}
+
 export async function getSettings() {
-  const { settings } = await chrome.storage.local.get("settings");
+  await ensureMigrated();
+  const { settings } = await SYNC.get("settings");
   return { ...DEFAULT_SETTINGS, ...(settings || {}) };
 }
 export async function saveSettings(patch) {
   const cur = await getSettings();
-  await chrome.storage.local.set({ settings: { ...cur, ...patch } });
+  await SYNC.set({ settings: { ...cur, ...patch } });
+}
+
+async function writeSetsToSync(sets) {
+  const all = await SYNC.get(null);
+  let otherBytes = 0;
+  for (const [k, v] of Object.entries(all)) {
+    if (!k.startsWith("set:") && k !== "setIndex") otherBytes += byteSize(k, v);
+  }
+  const oldIndex = Array.isArray(all.setIndex) ? all.setIndex : [];
+  const writes = {};
+  const removals = [];
+  const newLocal = {};
+  const newIndex = [];
+  let used = otherBytes;
+  for (const s of sets) {
+    const key = "set:" + s.id;
+    const size = byteSize(key, s);
+    if (size <= ITEM_SAFE && used + size <= SYNC_SOFT_CAP) {
+      writes[key] = s;
+      used += size;
+      newIndex.push({ id: s.id });
+    } else {
+      newLocal[s.id] = s;
+      newIndex.push({ id: s.id, local: true });
+    }
+  }
+  for (const e of oldIndex) {
+    const key = "set:" + e.id;
+    if (!(key in writes) && !e.local) removals.push(key);
+  }
+  writes.setIndex = newIndex;
+  await SYNC.set(writes);
+  if (removals.length) await SYNC.remove(removals);
+  await LOCAL.set({ localSets: newLocal });
 }
 export async function getSets() {
-  const { sets } = await chrome.storage.local.get("sets");
-  return Array.isArray(sets) ? sets : [];
+  await ensureMigrated();
+  const { setIndex } = await SYNC.get("setIndex");
+  const index = Array.isArray(setIndex) ? setIndex : [];
+  if (!index.length) return [];
+  const syncKeys = index.filter((e) => !e.local).map((e) => "set:" + e.id);
+  const data = syncKeys.length ? await SYNC.get(syncKeys) : {};
+  let localSets = {};
+  if (index.some((e) => e.local)) {
+    const r = await LOCAL.get("localSets");
+    localSets = r.localSets || {};
+  }
+  const sets = [];
+  for (const e of index) {
+    const s = e.local ? localSets[e.id] : data["set:" + e.id];
+    if (s) sets.push(s);
+  }
+  return sets;
 }
 export async function saveSets(sets) {
-  await chrome.storage.local.set({ sets });
+  await ensureMigrated();
+  await writeSetsToSync(sets);
 }
+
 export async function getRenames() {
-  const { renames } = await chrome.storage.local.get("renames");
-  return Array.isArray(renames) ? renames : [];
+  await ensureMigrated();
+  return readChunked("renames");
 }
 export async function saveRenames(renames) {
-  await chrome.storage.local.set({ renames });
+  await ensureMigrated();
+  await writeChunked("renames", renames);
 }
 // Quick tabs: favorite single sites pinned on the new tab page, optionally
 // grouped. Item: { id, title, url, group }
 export async function getQuickTabs() {
-  const { quickTabs } = await chrome.storage.local.get("quickTabs");
-  return Array.isArray(quickTabs) ? quickTabs : [];
+  await ensureMigrated();
+  return readChunked("quickTabs");
 }
 export async function saveQuickTabs(quickTabs) {
-  await chrome.storage.local.set({ quickTabs });
+  await ensureMigrated();
+  await writeChunked("quickTabs", quickTabs);
 }
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);

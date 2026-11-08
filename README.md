@@ -12,6 +12,7 @@ One Chrome extension that replaces five: New Tab Redirect, Save Pinned Tabs, Tab
 - **Quick tabs.** Favorite sites pinned on the new tab page, in groups, with an Open all that opens a group frozen except the first.
 - **Startup page.** Any page can open when Chrome starts (for example chatgpt.com).
 - **Backup and move.** Export your settings, sets, renames and quick tabs to one small file, import it on any other machine or browser.
+- **Chrome sync.** Settings, sets, renames and quick tabs sync through your Google sign-in to every Chrome running TabKit (v1.14.0 and up). The extension ID is pinned by the "key" field in manifest.json (ID cpkbaoodffhmdcenhcegcpofbikdbfcd), which is what makes every install share one sync bucket. A set too large for sync storage (about 8 KB per item, 100 KB total) stays on the local machine only and is marked as local in the set index.
 
 ## Install (unpacked)
 
@@ -23,4 +24,5 @@ One Chrome extension that replaces five: New Tab Redirect, Save Pinned Tabs, Tab
 ## Notes
 
 - Light theme in a warm off-white and clay palette.
-- All data lives in Chrome's local storage on your machine. Nothing is sent anywhere.
+- Your settings, sets, renames and quick tabs live in Chrome's sync storage, so they travel with your Google account. Sleep stats stay in local storage. Nothing is sent to any server of ours.
+- Upgrading from v1.13 or earlier: the pinned ID makes Chrome treat v1.14 as a new extension, and the old copy's data cannot move on its own. Export a backup from the old copy first (Settings, Backup and move), then load v1.14 and import that file once. After that, sync keeps every machine matched.

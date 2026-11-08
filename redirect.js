@@ -6,8 +6,17 @@
 (function () {
   function launcher() { document.documentElement.classList.add("tk-launcher"); }
   try {
-    chrome.storage.local.get("settings", function (d) {
-      var s = (d && d.settings) || {};
+    // Settings live in sync storage since v1.14.0. On the very first run
+    // after the upgrade the sync copy may not exist yet, so fall back to
+    // the old local copy once.
+    chrome.storage.sync.get("settings", function (d) {
+      if (d && d.settings) { decide(d.settings); return; }
+      chrome.storage.local.get("settings", function (d2) {
+        decide((d2 && d2.settings) || {});
+      });
+    });
+    function decide(settings) {
+      var s = settings || {};
       var u = (s.newTabUrl || "").trim();
       if (s.newTabMode === "url" && u) {
         if (!/^(https?|chrome|about|file):/i.test(u) && u.indexOf(" ") === -1 && u.indexOf(".") > -1) {
@@ -17,6 +26,6 @@
       } else {
         launcher();
       }
-    });
+    }
   } catch (e) { launcher(); }
 })();

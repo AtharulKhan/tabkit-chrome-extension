@@ -77,6 +77,7 @@
   fetchRule();
   // A rename saved from the popup lands in storage; pick it up live.
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.renames) fetchRule();
+    if (area !== "sync" && area !== "local") return;
+    if (Object.keys(changes).some((k) => k.startsWith("renames"))) fetchRule();
   });
 })();
