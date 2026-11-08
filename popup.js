@@ -3,6 +3,59 @@ import { getSets, hostOf } from "./store.js";
 const $ = (id) => document.getElementById(id);
 const msg = (t) => { $("msg").textContent = t || ""; };
 
+async function doOpenSet(set, windowId, closeStrays) {
+  $("switch-prompt").style.display = "none";
+  msg(`Opening "${set.name}"…`);
+  const r = await chrome.runtime.sendMessage({ type: "open-set", setId: set.id, windowId, closeStrays });
+  msg(r && r.ok ? `Opened "${set.name}".` : "Could not open the set.");
+  refreshStats(); refreshSets();
+}
+
+function showSwitchPrompt(set, windowId, strays) {
+  const box = $("switch-prompt");
+  box.innerHTML = "";
+  const head = document.createElement("div");
+  head.style.cssText = "font-size:13.5px; font-weight:650; margin-bottom:4px";
+  head.textContent = `${strays.count} other tab${strays.count === 1 ? "" : "s"} open in this window`;
+  const sub = document.createElement("div");
+  sub.className = "muted";
+  sub.style.fontSize = "12.5px";
+  sub.textContent = `They are not in "${set.name}". What should happen to them?`;
+  const list = document.createElement("div");
+  list.className = "muted";
+  list.style.cssText = "font-size:12px; margin-top:5px";
+  list.textContent = strays.tabs.slice(0, 4).map((t) => t.title).join(" · ") + (strays.count > 4 ? ` · and ${strays.count - 4} more` : "");
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.style.marginTop = "9px";
+  const now = new Date();
+  nameInput.value = `Tabs ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.marginTop = "8px";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "primary small";
+  saveBtn.textContent = "Save as a new set";
+  saveBtn.style.flex = "1";
+  saveBtn.onclick = async () => {
+    const r = await chrome.runtime.sendMessage({ type: "save-tabs-set", name: nameInput.value.trim() || "Saved tabs", tabIds: strays.tabs.map((t) => t.id) });
+    if (!r || !r.ok) { msg("Could not save those tabs as a set."); return; }
+    await doOpenSet(set, windowId, true);
+  };
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "small";
+  closeBtn.textContent = "Just close them";
+  closeBtn.onclick = () => doOpenSet(set, windowId, true);
+  const keepBtn = document.createElement("button");
+  keepBtn.className = "small";
+  keepBtn.textContent = "Keep them";
+  keepBtn.onclick = () => doOpenSet(set, windowId, false);
+  row.append(saveBtn, closeBtn, keepBtn);
+  box.append(head, sub, list, nameInput, row);
+  box.style.display = "block";
+  box.scrollIntoView({ block: "nearest" });
+}
+
 async function refreshStats() {
   const tabs = await chrome.tabs.query({});
   const awake = tabs.filter((t) => !t.discarded).length;
@@ -64,10 +117,9 @@ async function refreshSets() {
     open.textContent = "Open";
     open.style.flex = "1";
     open.onclick = async () => {
-      msg(`Opening "${set.name}"…`);
-      const r = await chrome.runtime.sendMessage({ type: "open-set", setId: set.id, windowId: win.id });
-      msg(r && r.ok ? `Opened "${set.name}".` : "Could not open the set.");
-      refreshStats(); refreshSets();
+      const ex = await chrome.runtime.sendMessage({ type: "window-strays", setId: set.id, windowId: win.id }).catch(() => null);
+      if (!ex || !ex.count) { await doOpenSet(set, win.id, false); return; }
+      showSwitchPrompt(set, win.id, ex);
     };
     const newWin = document.createElement("button");
     newWin.className = "small";

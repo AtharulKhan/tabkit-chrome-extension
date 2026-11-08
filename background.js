@@ -152,7 +152,22 @@ async function setWindowSet(windowId, setId) {
   await chrome.storage.session.set({ winSets: map });
 }
 
-export async function openSet(setId, windowId, { switchMode = true, onlyPinned = false } = {}) {
+// Tabs that are not part of the incoming set: hand-opened tabs, restored
+// tabs, anything the user picked up since. The launcher tab itself never
+// counts (the user is usually standing on it when they pick a set).
+export function strayTabs(set, tabs) {
+  const ownNewtab = `chrome-extension://${chrome.runtime.id}/newtab.html`;
+  const counts = new Map();
+  for (const t of set.tabs) counts.set(t.url, (counts.get(t.url) || 0) + 1);
+  return tabs.filter((t) => {
+    if (t.url === "chrome://newtab/" || t.url === ownNewtab || t.url === "about:blank") return false;
+    const c = counts.get(t.url) || 0;
+    if (c > 0) { counts.set(t.url, c - 1); return false; }
+    return true;
+  });
+}
+
+export async function openSet(setId, windowId, { switchMode = true, onlyPinned = false, closeStrays = false } = {}) {
   const sets = await getSets();
   const found = sets.find((x) => x.id === setId);
   if (!found) return { ok: false, error: "Set not found" };
@@ -163,8 +178,12 @@ export async function openSet(setId, windowId, { switchMode = true, onlyPinned =
   const map = await getWindowSetMap();
   const prevSetId = map[win.id];
 
-  // Switching: close the previous set's tabs that are not part of the new set
-  if (switchMode && prevSetId && prevSetId !== setId) {
+  // The user was asked about stray tabs and chose to close them: every tab
+  // that is not part of the incoming set goes.
+  if (closeStrays) {
+    for (const t of strayTabs(set, existing)) { try { await chrome.tabs.remove(t.id); } catch { /* already gone */ } }
+  } else if (switchMode && prevSetId && prevSetId !== setId) {
+    // Switching: close the previous set's tabs that are not part of the new set
     const prev = sets.find((x) => x.id === prevSetId);
     if (prev) {
       const keep = new Set(set.tabs.map((t) => t.url));
@@ -347,8 +366,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           break;
         }
         case "open-set": {
-          const r = await openSet(msg.setId, msg.windowId, { switchMode: msg.switchMode !== false });
+          const r = await openSet(msg.setId, msg.windowId, { switchMode: msg.switchMode !== false, closeStrays: !!msg.closeStrays });
           sendResponse(r);
+          break;
+        }
+        case "window-strays": {
+          const sets = await getSets();
+          const set = sets.find((x) => x.id === msg.setId);
+          if (!set) { sendResponse({ count: 0, tabs: [] }); break; }
+          const tabs = await chrome.tabs.query({ windowId: msg.windowId });
+          const strays = strayTabs(set, tabs);
+          sendResponse({ count: strays.length, tabs: strays.map((t) => ({ id: t.id, title: t.title || t.url, url: t.url })) });
+          break;
+        }
+        case "save-tabs-set": {
+          const items = [];
+          for (const id of msg.tabIds || []) {
+            const t = await chrome.tabs.get(id).catch(() => null);
+            if (t && (isSleepableUrl(t.url) || t.pinned)) items.push({ url: t.url, title: t.title || t.url, pinned: !!t.pinned, favIconUrl: t.favIconUrl || "" });
+          }
+          if (!items.length) { sendResponse({ ok: false, error: "Nothing to save" }); break; }
+          const sets = await getSets();
+          const set = { id: uid(), name: msg.name || "Saved tabs", tabs: items, createdAt: Date.now() };
+          sets.push(set);
+          await saveSets(sets);
+          sendResponse({ ok: true, set });
           break;
         }
         case "open-set-new-window": {

@@ -230,7 +230,43 @@ async function init() {
     tile.append(h, favs, meta);
     tile.onclick = async () => {
       const win = await chrome.windows.getLastFocused();
-      await chrome.runtime.sendMessage({ type: "open-set", setId: set.id, windowId: win.id });
+      const ex = await chrome.runtime.sendMessage({ type: "window-strays", setId: set.id, windowId: win.id }).catch(() => null);
+      if (!ex || !ex.count) {
+        await chrome.runtime.sendMessage({ type: "open-set", setId: set.id, windowId: win.id });
+        return;
+      }
+      const box = document.getElementById("switch-prompt");
+      box.innerHTML = "";
+      const head = document.createElement("div");
+      head.style.cssText = "font-size:15px; font-weight:650";
+      head.textContent = `${ex.count} other tab${ex.count === 1 ? "" : "s"} open in this window`;
+      const sub = document.createElement("div");
+      sub.className = "muted";
+      sub.style.marginTop = "3px";
+      sub.textContent = `They are not in "${set.name}". What should happen to them?`;
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; gap:8px; margin-top:11px; flex-wrap:wrap";
+      const mk = (label, primary, fn) => {
+        const b = document.createElement("button");
+        b.textContent = label;
+        if (primary) b.className = "primary";
+        b.onclick = async () => { box.style.display = "none"; await fn(); };
+        return b;
+      };
+      const doOpen = (closeStrays) => chrome.runtime.sendMessage({ type: "open-set", setId: set.id, windowId: win.id, closeStrays });
+      row.append(
+        mk("Save them as a new set, then open", true, async () => {
+          const now = new Date();
+          const name = `Tabs ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+          await chrome.runtime.sendMessage({ type: "save-tabs-set", name, tabIds: ex.tabs.map((t) => t.id) });
+          await doOpen(true);
+        }),
+        mk("Just close them", false, () => doOpen(true)),
+        mk("Keep them", false, () => doOpen(false)),
+      );
+      box.append(head, sub, row);
+      box.style.display = "block";
+      box.scrollIntoView({ block: "nearest" });
     };
     tiles.appendChild(tile);
   }
