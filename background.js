@@ -312,10 +312,17 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-async function applyRename(tab, title) {
+async function applyRename(tab, title, favicon) {
   const renames = await getRenames();
+  const existing = renames.find((r) => r.match === "exact" && r.pattern === tab.url);
   const filtered = renames.filter((r) => !(r.match === "exact" && r.pattern === tab.url));
-  if (title) filtered.unshift({ id: uid(), match: "exact", pattern: tab.url, title });
+  // favicon undefined means keep the one already on the rule, null clears it.
+  const fav = favicon === undefined ? (existing && existing.favicon) || null : favicon;
+  if (title || fav) {
+    const rule = { id: uid(), match: "exact", pattern: tab.url, title: title || "" };
+    if (fav) rule.favicon = fav;
+    filtered.unshift(rule);
+  }
   await saveRenames(filtered);
   if (title) {
     try {
@@ -336,7 +343,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case "get-rename": {
           const renames = await getRenames();
           const hit = findRename(renames, msg.url);
-          sendResponse({ title: hit ? hit.title : null });
+          sendResponse({ title: hit ? hit.title || null : null, favicon: hit ? hit.favicon || null : null });
           break;
         }
         case "open-set": {
@@ -380,7 +387,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case "discard-pass": { const n = await discardPass(); sendResponse({ ok: true, slept: n }); break; }
         case "rename-current": {
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (tab) await applyRename(tab, (msg.title || "").trim());
+          if (tab) await applyRename(tab, (msg.title || "").trim(), msg.favicon);
           sendResponse({ ok: true });
           break;
         }

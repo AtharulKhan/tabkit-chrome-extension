@@ -64,7 +64,16 @@ async function renderRenames() {
     const line = document.createElement("div");
     line.className = "rename-line";
     const pat = document.createElement("span"); pat.textContent = r.pattern; pat.style.flex = "1";
-    const title = document.createElement("strong"); title.textContent = r.title;
+    const title = document.createElement("strong"); title.textContent = r.title || "(icon only)";
+    if (r.favicon) {
+      const mark = document.createElement("span");
+      if (r.favicon.kind === "emoji") { mark.textContent = r.favicon.value; }
+      else if (r.favicon.kind === "badge") {
+        mark.textContent = (r.favicon.letter || "?").slice(0, 1).toUpperCase();
+        mark.style.cssText = `background:${r.favicon.color}; color:#fff; border-radius:5px; padding:1px 5px; font-size:11px; font-weight:700`;
+      } else { mark.textContent = "🖼"; }
+      line.appendChild(mark);
+    }
     const del = document.createElement("button");
     del.className = "danger small"; del.textContent = "Delete";
     del.onclick = async () => {
@@ -101,12 +110,19 @@ $("save-window-set").onclick = async () => {
 $("rename-add").onclick = async () => {
   const pattern = $("rename-pattern").value.trim();
   const title = $("rename-title").value.trim();
-  if (!pattern || !title) { msg("A rename rule needs both the site and the new title."); return; }
+  const emoji = $("rename-emoji").value.trim();
+  const color = $("rename-color").value;
+  if (!pattern || (!title && !emoji && !color)) { msg("A rename rule needs the site, plus a title or an icon."); return; }
   const match = pattern.includes("://") ? "exact" : "domain";
+  let favicon = null;
+  if (emoji) favicon = { kind: "emoji", value: emoji };
+  else if (color) favicon = { kind: "badge", color, letter: (title.match(/[a-z0-9]/i) || ["?"])[0].toUpperCase() };
+  const rule = { id: uid(), match, pattern, title };
+  if (favicon) rule.favicon = favicon;
   const renames = await getRenames();
-  renames.unshift({ id: uid(), match, pattern, title });
+  renames.unshift(rule);
   await saveRenames(renames);
-  $("rename-pattern").value = ""; $("rename-title").value = "";
+  $("rename-pattern").value = ""; $("rename-title").value = ""; $("rename-emoji").value = ""; $("rename-color").value = "";
   msg("Rename rule added.");
   renderRenames();
 };

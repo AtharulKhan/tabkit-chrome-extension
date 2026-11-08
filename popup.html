@@ -24,6 +24,10 @@
   #msg { min-height: 18px; color: var(--accent); font-size: 12.5px; margin-top: 8px; }
   .footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
   .footer button { font-size: 12px; }
+  .icon-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .icon-label { font-size: 12px; color: var(--muted); font-weight: 650; }
+  .swatch { width: 20px; height: 20px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; box-shadow: none; }
+  .swatch.sel { border-color: var(--ink); }
 </style>
 </head>
 <body>
@@ -56,6 +60,13 @@
     <input type="text" id="rename-input" placeholder="New title for this tab">
     <button id="rename-save" class="small">Save</button>
   </div>
+  <div class="icon-row">
+    <span class="icon-label">Icon</span>
+    <span id="swatches"></span>
+    <input type="text" id="favicon-emoji" placeholder="or emoji" maxlength="8" style="width:74px; flex:none">
+    <button class="link-btn" id="favicon-none">No icon</button>
+  </div>
+  <p class="muted" style="margin:2px 0 0; font-size:12px">Colour makes a badge with the first letter of the title. Saved for this exact page, so each Google Sheet can look different.</p>
 
   <div id="msg"></div>
 

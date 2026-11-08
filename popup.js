@@ -116,10 +116,47 @@ $("save-set-btn").onclick = async () => {
   refreshSets();
 };
 
+const FAV_COLORS = ["#C15F3C", "#3E7C4F", "#2F5D8A", "#6B4E9E", "#B07D2B", "#2E7D74", "#A63A3A", "#6E6A5E"];
+let selectedFavicon = null;
+
+function paintSwatches() {
+  const wrap = $("swatches");
+  wrap.innerHTML = "";
+  for (const color of FAV_COLORS) {
+    const b = document.createElement("button");
+    b.className = "swatch" + (selectedFavicon && selectedFavicon.kind === "badge" && selectedFavicon.color === color ? " sel" : "");
+    b.style.background = color;
+    b.title = "Colour badge";
+    b.onclick = () => {
+      selectedFavicon = { kind: "badge", color };
+      $("favicon-emoji").value = "";
+      paintSwatches();
+    };
+    wrap.appendChild(b);
+  }
+}
+
+$("favicon-emoji").oninput = () => {
+  const v = $("favicon-emoji").value.trim();
+  selectedFavicon = v ? { kind: "emoji", value: v } : null;
+  if (v) paintSwatches();
+};
+
+$("favicon-none").onclick = () => {
+  selectedFavicon = null;
+  $("favicon-emoji").value = "";
+  paintSwatches();
+};
+
 $("rename-save").onclick = async () => {
-  const title = $("rename-input").value;
-  await chrome.runtime.sendMessage({ type: "rename-current", title });
-  msg(title.trim() ? "Tab renamed. It will keep this name on reload." : "Rename cleared.");
+  const title = $("rename-input").value.trim();
+  let favicon = selectedFavicon;
+  if (favicon && favicon.kind === "badge") {
+    const letter = (title.match(/[a-z0-9]/i) || ["?"])[0].toUpperCase();
+    favicon = { kind: "badge", color: favicon.color, letter };
+  }
+  await chrome.runtime.sendMessage({ type: "rename-current", title, favicon });
+  msg(title || favicon ? "Saved for this page. It will keep this name and icon on reload." : "Rename cleared.");
 };
 
 $("shortcut-change").onclick = () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
@@ -127,6 +164,20 @@ $("shortcut-change").onclick = () => chrome.tabs.create({ url: "chrome://extensi
 (async () => {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (tab) $("rename-input").placeholder = tab.title || "New title for this tab";
+  paintSwatches();
+  if (tab && tab.url) {
+    try {
+      const rule = await chrome.runtime.sendMessage({ type: "get-rename", url: tab.url });
+      if (rule) {
+        if (rule.title) $("rename-input").value = rule.title;
+        if (rule.favicon) {
+          selectedFavicon = rule.favicon;
+          if (rule.favicon.kind === "emoji") $("favicon-emoji").value = rule.favicon.value;
+          paintSwatches();
+        }
+      }
+    } catch { /* no rule yet */ }
+  }
   try {
     const cmds = await chrome.commands.getAll();
     const qs = cmds.find((c) => c.name === "quick-switch");
