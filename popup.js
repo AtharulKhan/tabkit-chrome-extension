@@ -121,6 +121,25 @@ async function refreshSets() {
       if (!ex || !ex.count) { await doOpenSet(set, win.id, false); return; }
       showSwitchPrompt(set, win.id, ex);
     };
+    const upd = document.createElement("button");
+    upd.className = "small";
+    upd.textContent = "Update";
+    upd.title = "Replace this set's saved tabs with this window's tabs right now";
+    let armed = false;
+    let armTimer = null;
+    upd.onclick = async () => {
+      if (!armed) {
+        armed = true;
+        upd.textContent = "Sure?";
+        armTimer = setTimeout(() => { armed = false; upd.textContent = "Update"; }, 3000);
+        msg(`Tap Sure to replace "${set.name}" with this window's tabs as they are now.`);
+        return;
+      }
+      clearTimeout(armTimer);
+      const r = await chrome.runtime.sendMessage({ type: "update-set", setId: set.id, windowId: win.id });
+      msg(r && r.ok ? `Updated "${set.name}": it now holds this window's ${r.set.tabs.length} tabs.` : "Could not update the set.");
+      refreshStats(); refreshSets();
+    };
     const newWin = document.createElement("button");
     newWin.className = "small";
     newWin.textContent = "New window";
@@ -129,7 +148,7 @@ async function refreshSets() {
       const r = await chrome.runtime.sendMessage({ type: "open-set-new-window", setId: set.id });
       msg(r && r.ok ? `Opened "${set.name}" in a new window.` : "Could not open the set.");
     };
-    actions.append(open, newWin);
+    actions.append(open, upd, newWin);
 
     card.append(top, meta, favs, actions);
     wrap.appendChild(card);

@@ -42,6 +42,15 @@ async function renderSets() {
       msg("Startup set updated.");
       renderSets();
     };
+    const upd = document.createElement("button");
+    upd.className = "small"; upd.textContent = "Update to this window";
+    upd.title = "Replace this set's saved tabs with the current window's tabs";
+    upd.onclick = async () => {
+      const win = await chrome.windows.getLastFocused();
+      const r = await chrome.runtime.sendMessage({ type: "update-set", setId: set.id, windowId: win.id });
+      msg(r && r.ok ? `Updated "${set.name}" with this window's ${r.set.tabs.length} tabs.` : "Could not update the set.");
+      renderSets();
+    };
     const del = document.createElement("button");
     del.className = "danger small"; del.textContent = "Delete";
     del.onclick = async () => {
@@ -50,7 +59,7 @@ async function renderSets() {
       msg(`Deleted "${set.name}".`);
       renderSets();
     };
-    actions.append(open, star, del);
+    actions.append(open, star, upd, del);
     row.append(top, names, actions);
     list.appendChild(row);
   }

@@ -227,13 +227,28 @@ export async function openSet(setId, windowId, { switchMode = true, onlyPinned =
   return { ok: true, opened, name: set.name };
 }
 
-async function saveWindowAsSet(name, windowId) {
+async function windowTabsAsItems(windowId) {
   const tabs = await chrome.tabs.query({ windowId });
-  const items = tabs.filter((t) => isSleepableUrl(t.url) || t.pinned)
+  return tabs.filter((t) => isSleepableUrl(t.url) || t.pinned)
     .map((t) => ({ url: t.url, title: t.title || t.url, pinned: !!t.pinned, favIconUrl: t.favIconUrl || "" }));
+}
+
+async function saveWindowAsSet(name, windowId) {
+  const items = await windowTabsAsItems(windowId);
   const sets = await getSets();
   const set = { id: uid(), name: name || "My set", tabs: items, createdAt: Date.now() };
   sets.push(set);
+  await saveSets(sets);
+  await setWindowSet(windowId, set.id);
+  return set;
+}
+
+async function updateSetWithWindow(setId, windowId) {
+  const sets = await getSets();
+  const set = sets.find((x) => x.id === setId);
+  if (!set) return null;
+  set.tabs = await windowTabsAsItems(windowId);
+  set.updatedAt = Date.now();
   await saveSets(sets);
   await setWindowSet(windowId, set.id);
   return set;
@@ -410,6 +425,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case "save-set": {
           const set = await saveWindowAsSet(msg.name, msg.windowId);
           sendResponse({ ok: true, set });
+          break;
+        }
+        case "update-set": {
+          const set = await updateSetWithWindow(msg.setId, msg.windowId);
+          sendResponse(set ? { ok: true, set } : { ok: false, error: "Set not found" });
           break;
         }
         case "sleep-now": {
