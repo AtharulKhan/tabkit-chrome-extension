@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { width: 360px; padding: 14px; }
+  .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .brand .logo { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(160deg, #d97757, #c15f3c); color: #fff; font-weight: 800; display: grid; place-items: center; }
+  .brand h1 { font-size: 16px; }
+  .stat-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .stat-line .big { font-size: 15px; font-weight: 650; }
+  .section-title { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; font-weight: 650; }
+  .set-card { margin-bottom: 8px; padding: 11px 12px; }
+  .set-card .name { font-size: 14.5px; font-weight: 650; }
+  .set-card .meta { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .favicons { display: flex; gap: 3px; margin-top: 7px; flex-wrap: wrap; }
+  .favicons img { width: 16px; height: 16px; border-radius: 4px; background: #f0eee6; padding: 1px; }
+  .badge { font-size: 11px; font-weight: 650; color: var(--accent); background: var(--accent-dark); border: 1px solid rgba(193,95,60,.22); padding: 2px 8px; border-radius: 999px; }
+  .link-btn { background: none; border: none; color: var(--muted); font-size: 12px; padding: 2px 0; cursor: pointer; box-shadow: none; }
+  .link-btn:hover { color: var(--accent); background: none; border: none; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  #save-set-btn { width: 100%; margin-top: 8px; }
+  #msg { min-height: 18px; color: var(--accent); font-size: 12.5px; margin-top: 8px; }
+  .footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .footer button { font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="logo"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="13" height="10" rx="3" fill="rgba(255,255,255,.45)"/><rect x="8" y="10" width="13" height="10" rx="3" fill="#fff"/></svg></div>
+    <h1>TabKit</h1>
+    <span style="flex:1"></span>
+    <button class="small" id="open-options">Settings</button>
+  </div>
+
+  <div class="stat-line">
+    <span class="big" id="awake-count">…</span>
+    <span style="flex:1"></span>
+    <span class="pill" id="slept-today">0 put to sleep today</span>
+  </div>
+  <div class="bar"><div id="bar" style="width:0%"></div></div>
+
+  <div class="section-title">Tab sets</div>
+  <div id="sets"></div>
+  <input type="text" id="set-name" placeholder="Name this window's tabs" style="margin-top:4px">
+  <button class="primary" id="save-set-btn">Save this window as a set</button>
+
+  <div class="actions">
+    <button id="sleep-inactive">Sleep inactive tabs</button>
+    <button id="sleep-others">Sleep all but this one</button>
+  </div>
+
+  <div class="section-title">Rename this tab</div>
+  <div class="row">
+    <input type="text" id="rename-input" placeholder="New title for this tab">
+    <button id="rename-save" class="small">Save</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <div class="footer">
+    <span id="shortcut-note">Quick switch: …</span>
+    <button class="link-btn" id="shortcut-change">Change</button>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

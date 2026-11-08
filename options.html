@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TabKit</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { padding: 22px 26px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(160deg, #d97757, #c15f3c); color: #ffffff; font-weight: 800; display: grid; place-items: center; }
+  header h1 { font-size: 19px; }
+  .grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; align-items: start; }
+  .col { display: grid; gap: 14px; }
+  .card h2 { font-size: 14.5px; margin-bottom: 8px; }
+  .set-row { padding: 9px 0; border-top: 1px solid var(--line); }
+  .set-row:first-of-type { border-top: none; padding-top: 2px; }
+  .set-row .names { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+  .rename-line { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+  .rename-line:first-of-type { border-top: none; }
+  .field-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .field-row label { margin: 0; flex: 1; color: var(--text); font-size: 13px; }
+  .field-row label.switch { flex: none; margin: 0; }
+  .field-row input[type="number"] { width: 76px; flex: none; }
+  #msg { color: var(--accent); min-height: 20px; margin-bottom: 6px; font-size: 13px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="13" height="10" rx="3" fill="rgba(255,255,255,.45)"/><rect x="8" y="10" width="13" height="10" rx="3" fill="#fff"/></svg></div>
+    <h1>TabKit</h1>
+    <span style="flex:1"></span>
+    <button id="export-btn" class="small">Export setup</button>
+    <button id="import-btn" class="small">Import</button>
+    <input type="file" id="import-file" accept="application/json,.json" hidden>
+    <button class="primary small" id="save-all">Save options</button>
+  </header>
+
+  <div id="msg"></div>
+
+  <div class="grid">
+    <div class="col">
+    <div class="card">
+      <h2>Tab sets</h2>
+      <div id="set-list"></div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="new-set-name" placeholder="Name for this window's tabs">
+        <button id="save-window-set" class="small">Save set</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0; font-size:12.5px">Opening a set closes the previous set's tabs in that window. The startup set's pinned tabs return at every launch, asleep.</p>
+    </div>
+
+    <div class="card">
+      <h2>Renames</h2>
+      <div id="rename-list"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="rename-pattern" placeholder="Site, e.g. mail.google.com">
+        <input type="text" id="rename-title" placeholder="New title">
+        <button id="rename-add" class="small">Add</button>
+      </div>
+    </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <h2>Memory saver</h2>
+        <div class="field-row">
+          <label>Sleep a tab after this many idle minutes (0 = off)</label>
+          <input type="number" id="discard-minutes" min="0" max="240">
+        </div>
+        <div class="field-row">
+          <label>Pinned tabs can sleep too</label>
+          <label class="switch"><input type="checkbox" id="discard-pinned"><span class="track"></span></label>
+        </div>
+        <div class="field-row">
+          <label>Tabs from a set open asleep</label>
+          <label class="switch"><input type="checkbox" id="sleep-on-open"><span class="track"></span></label>
+        </div>
+        <div class="field-row">
+          <label>Never sleep a tab that is playing sound</label>
+          <label class="switch"><input type="checkbox" id="protect-audible"><span class="track"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>New tab and startup</h2>
+        <label style="margin-top:2px">New tab opens</label>
+        <select id="newtab-mode">
+          <option value="launcher">The TabKit launcher (clock, search, sets)</option>
+          <option value="url">One page instead, below</option>
+        </select>
+        <label>New tab page (a plain name works, like chatgpt.com)</label>
+        <input type="text" id="newtab-url" placeholder="chatgpt.com">
+        <label>Startup page, opened when Chrome starts (optional)</label>
+        <input type="text" id="startup-url" placeholder="chatgpt.com">
+      </div>
+
+      <div class="card">
+        <h2>Never sleep</h2>
+        <label style="margin-top:2px">Sites that are never put to sleep, separated by commas</label>
+        <input type="text" id="exceptions-text" placeholder="web.whatsapp.com, music.youtube.com">
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="options.js"></script>
+</body>
+</html>

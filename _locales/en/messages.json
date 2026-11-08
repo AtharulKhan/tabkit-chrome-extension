@@ -1,0 +1,4 @@
+{
+  "appName": { "message": "TabKit", "description": "Extension name" },
+  "appDesc": { "message": "Tab sets, pinned sets, smart tab sleeping, quick tab switch, tab renames and a custom new tab page. One extension that keeps Chrome light.", "description": "Extension description" }
+}

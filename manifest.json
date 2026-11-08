@@ -1,0 +1,88 @@
+{
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TabKit",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "commands": {
+    "discard-others": {
+      "description": "Put all other tabs in this window to sleep"
+    },
+    "discard-tab": {
+      "description": "Put the current tab to sleep now"
+    },
+    "quick-switch": {
+      "description": "Switch to the previous tab (Alt+Tab for tabs)",
+      "suggested_key": {
+        "default": "Alt+Z",
+        "mac": "Alt+Z"
+      }
+    },
+    "rename-tab": {
+      "description": "Rename the current tab",
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      }
+    }
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "renamer.js"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "default_locale": "en",
+  "description": "__MSG_appDesc__",
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "manifest_version": 3,
+  "name": "__MSG_appName__",
+  "options_page": "options.html",
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "contextMenus",
+    "scripting",
+    "history",
+    "bookmarks"
+  ],
+  "version": "1.7.0",
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "newtab.html"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
