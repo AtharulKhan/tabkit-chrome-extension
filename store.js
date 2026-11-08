@@ -22,11 +22,12 @@ export const DEFAULT_SETTINGS = {
 // Sync limits that shape the layout: about 100 KB total, 8 KB per item.
 //   settings             -> one item
 //   renames, quickTabs   -> chunked arrays (base, base#1, ... plus base$n)
-//   setIndex             -> [{ id, local }] one entry per set
-//   set:<id>             -> one set per item
-// A set that is too big for one sync item, or saved when sync storage is
-// nearly full, falls back to chrome.storage.local (localSets) and is
-// flagged local:true in the index, so it still works on that machine.
+//   setIndex             -> [{ id, chunks }] one entry per set
+//   set:<id>             -> the set; for a big set this is the head item
+//                           (all fields, tabs held in chunk items)
+//   set:<id>#<i>         -> tab chunks for a big set, each under the cap
+// A set only falls back to chrome.storage.local (localSets, flagged
+// local:true in the index) when sync storage itself is nearly full.
 const SYNC = chrome.storage.sync;
 const LOCAL = chrome.storage.local;
 const ITEM_SAFE = 7000;    // stay under the 8192 per-item cap
@@ -46,14 +47,26 @@ function ensureMigrated() {
     migratePromise = (async () => {
       try {
         const { syncMigrated } = await LOCAL.get("syncMigrated");
-        if (syncMigrated) return;
-        const local = await LOCAL.get(["settings", "sets", "renames", "quickTabs"]);
-        const syncHas = await SYNC.get(["settings", "setIndex", "renames", "quickTabs"]);
-        if (local.settings && !syncHas.settings) await SYNC.set({ settings: local.settings });
-        if (Array.isArray(local.renames) && local.renames.length && !syncHas.renames) await writeChunked("renames", local.renames);
-        if (Array.isArray(local.quickTabs) && local.quickTabs.length && !syncHas.quickTabs) await writeChunked("quickTabs", local.quickTabs);
-        if (Array.isArray(local.sets) && local.sets.length && !syncHas.setIndex) await writeSetsToSync(local.sets);
-        await LOCAL.set({ syncMigrated: true });
+        if (!syncMigrated) {
+          const local = await LOCAL.get(["settings", "sets", "renames", "quickTabs"]);
+          const syncHas = await SYNC.get(["settings", "setIndex", "renames", "quickTabs"]);
+          if (local.settings && !syncHas.settings) await SYNC.set({ settings: local.settings });
+          if (Array.isArray(local.renames) && local.renames.length && !syncHas.renames) await writeChunked("renames", local.renames);
+          if (Array.isArray(local.quickTabs) && local.quickTabs.length && !syncHas.quickTabs) await writeChunked("quickTabs", local.quickTabs);
+          if (Array.isArray(local.sets) && local.sets.length && !syncHas.setIndex) await writeSetsToSync(local.sets);
+          await LOCAL.set({ syncMigrated: true });
+        }
+        // v1.14.1 repack: sets that v1.14.0 parked in local storage for
+        // size are rewritten into sync storage in chunks, so they sync.
+        const { syncRepack141 } = await LOCAL.get("syncRepack141");
+        if (!syncRepack141) {
+          const { setIndex } = await SYNC.get("setIndex");
+          if (Array.isArray(setIndex) && setIndex.some((e) => e.local)) {
+            const all = await readAllSetsRaw();
+            if (all.length) await writeSetsToSync(all);
+          }
+          await LOCAL.set({ syncRepack141: true });
+        }
       } catch { /* sync storage unavailable: getters still read sync area, which behaves like local when sync is off */ }
     })();
   }
@@ -104,6 +117,33 @@ export async function saveSettings(patch) {
   await SYNC.set({ settings: { ...cur, ...patch } });
 }
 
+// Plan the sync items for one set. A set that fits in one item is stored
+// whole. A bigger set is split: a head item with every field except the
+// tabs, plus one item per chunk of tabs. Returns null when even a single
+// tab cannot fit an item (not expected in real use).
+function planSetItems(s) {
+  const headKey = "set:" + s.id;
+  if (byteSize(headKey, s) <= ITEM_SAFE) return [{ key: headKey, value: s }];
+  const { tabs, ...rest } = s;
+  const list = tabs || [];
+  for (const t of list) {
+    if (byteSize(headKey + "#0", { tabs: [t] }) > ITEM_SAFE) return null;
+  }
+  const chunks = [];
+  let cur = [];
+  for (const t of list) {
+    const trial = [...cur, t];
+    if (cur.length && byteSize(headKey + "#0", { tabs: trial }) > ITEM_SAFE) { chunks.push(cur); cur = [t]; }
+    else cur = trial;
+  }
+  if (cur.length || !chunks.length) chunks.push(cur);
+  const head = { ...rest, tabs: [], tabChunks: chunks.length };
+  if (byteSize(headKey, head) > ITEM_SAFE) return null;
+  const items = [{ key: headKey, value: head }];
+  chunks.forEach((c, i) => items.push({ key: `${headKey}#${i}`, value: { tabs: c } }));
+  return items;
+}
+
 async function writeSetsToSync(sets) {
   const all = await SYNC.get(null);
   let otherBytes = 0;
@@ -112,38 +152,44 @@ async function writeSetsToSync(sets) {
   }
   const oldIndex = Array.isArray(all.setIndex) ? all.setIndex : [];
   const writes = {};
-  const removals = [];
   const newLocal = {};
   const newIndex = [];
+  const plannedKeys = new Set();
   let used = otherBytes;
   for (const s of sets) {
-    const key = "set:" + s.id;
-    const size = byteSize(key, s);
-    if (size <= ITEM_SAFE && used + size <= SYNC_SOFT_CAP) {
-      writes[key] = s;
-      used += size;
-      newIndex.push({ id: s.id });
+    const items = planSetItems(s);
+    const total = items ? items.reduce((n, it) => n + byteSize(it.key, it.value), 0) : Infinity;
+    if (items && used + total <= SYNC_SOFT_CAP) {
+      for (const it of items) { writes[it.key] = it.value; plannedKeys.add(it.key); }
+      used += total;
+      newIndex.push({ id: s.id, chunks: items.length - 1 });
     } else {
       newLocal[s.id] = s;
       newIndex.push({ id: s.id, local: true });
     }
   }
+  const removals = [];
   for (const e of oldIndex) {
-    const key = "set:" + e.id;
-    if (!(key in writes) && !e.local) removals.push(key);
+    if (e.local) continue;
+    const oldKeys = ["set:" + e.id];
+    for (let i = 0; i < (e.chunks || 0); i++) oldKeys.push(`set:${e.id}#${i}`);
+    for (const k of oldKeys) if (!plannedKeys.has(k)) removals.push(k);
   }
   writes.setIndex = newIndex;
   await SYNC.set(writes);
   if (removals.length) await SYNC.remove(removals);
   await LOCAL.set({ localSets: newLocal });
 }
-export async function getSets() {
-  await ensureMigrated();
+
+// Reads every set from storage without running the migration first, so
+// the migration itself can use it. Handles all layouts: single item,
+// chunked, and the v1.14.0 local fallback.
+async function readAllSetsRaw() {
   const { setIndex } = await SYNC.get("setIndex");
   const index = Array.isArray(setIndex) ? setIndex : [];
   if (!index.length) return [];
-  const syncKeys = index.filter((e) => !e.local).map((e) => "set:" + e.id);
-  const data = syncKeys.length ? await SYNC.get(syncKeys) : {};
+  const headKeys = index.filter((e) => !e.local).map((e) => "set:" + e.id);
+  const heads = headKeys.length ? await SYNC.get(headKeys) : {};
   let localSets = {};
   if (index.some((e) => e.local)) {
     const r = await LOCAL.get("localSets");
@@ -151,10 +197,30 @@ export async function getSets() {
   }
   const sets = [];
   for (const e of index) {
-    const s = e.local ? localSets[e.id] : data["set:" + e.id];
-    if (s) sets.push(s);
+    if (e.local) {
+      const s = localSets[e.id];
+      if (s) sets.push(s);
+      continue;
+    }
+    const head = heads["set:" + e.id];
+    if (!head) continue;
+    if (head.tabChunks) {
+      const keys = [];
+      for (let i = 0; i < head.tabChunks; i++) keys.push(`set:${e.id}#${i}`);
+      const parts = await SYNC.get(keys);
+      let tabs = [];
+      for (const k of keys) if (parts[k] && Array.isArray(parts[k].tabs)) tabs = tabs.concat(parts[k].tabs);
+      const { tabChunks, ...rest } = head;
+      sets.push({ ...rest, tabs });
+    } else {
+      sets.push(head);
+    }
   }
   return sets;
+}
+export async function getSets() {
+  await ensureMigrated();
+  return readAllSetsRaw();
 }
 export async function saveSets(sets) {
   await ensureMigrated();
