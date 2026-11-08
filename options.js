@@ -106,6 +106,8 @@ async function loadSettings() {
   $("exceptions-text").value = (s.exceptions || []).join(", ");
 }
 
+$("open-sets-manager").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("sets.html") });
+
 $("save-window-set").onclick = async () => {
   const name = $("new-set-name").value.trim();
   if (!name) { msg("Give the set a name first."); return; }

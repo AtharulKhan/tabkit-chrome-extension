@@ -156,6 +156,7 @@ async function refreshSets() {
 }
 
 $("open-options").onclick = () => chrome.runtime.openOptionsPage();
+$("see-all-sets").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("sets.html") });
 
 $("sleep-inactive").onclick = async () => {
   const win = await chrome.windows.getLastFocused();

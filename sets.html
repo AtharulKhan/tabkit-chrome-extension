@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TabKit · Tab sets</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { max-width: 900px; margin: 0 auto; padding: 26px 22px 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .logo { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(160deg, #d97757, #c15f3c); display: grid; place-items: center; }
+  .brand h1 { font-size: 21px; margin: 0; }
+  #search { margin-top: 18px; font-size: 15px; padding: 11px 14px; }
+  #count { margin: 10px 2px 16px; font-size: 12.5px; }
+  .set-card { padding: 16px 18px; margin-bottom: 14px; }
+  .set-card h2 { font-size: 16.5px; margin: 0; }
+  .meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .tab-list { margin-top: 11px; border-top: 1px solid var(--line); }
+  .tab-line { display: flex; align-items: center; gap: 9px; padding: 6px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .tab-line:last-child { border-bottom: none; }
+  .tab-line img { width: 16px; height: 16px; border-radius: 4px; background: #f0eee6; padding: 1px; flex: none; }
+  .tab-line a { color: var(--text); text-decoration: none; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-line a:hover { color: var(--accent); }
+  .pin { font-size: 11px; color: var(--muted); flex: none; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  #switch-prompt { display: none; padding: 14px 16px; margin-bottom: 14px; }
+  #msg { min-height: 20px; color: var(--accent); font-size: 13.5px; margin-top: 6px; }
+  .badge { font-size: 11px; font-weight: 650; color: var(--accent); background: var(--accent-dark); border: 1px solid rgba(193,95,60,.22); padding: 2px 8px; border-radius: 999px; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="13" height="10" rx="3" fill="rgba(255,255,255,.45)"/><rect x="8" y="10" width="13" height="10" rx="3" fill="#fff"/></svg></div>
+    <h1>Tab sets</h1>
+    <span style="flex:1"></span>
+    <button class="small" id="open-settings">Settings</button>
+  </div>
+
+  <input type="text" id="search" placeholder="Search sets by name, or by a tab's title or site">
+  <div id="count" class="muted"></div>
+
+  <div id="switch-prompt" class="card"></div>
+  <div id="msg"></div>
+  <div id="sets"></div>
+
+  <script type="module" src="sets.js"></script>
+</body>
+</html>
