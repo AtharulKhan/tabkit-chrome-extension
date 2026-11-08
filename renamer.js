@@ -2,6 +2,8 @@
 // this page (exact URL first, then domain) and keeps the custom title and
 // favicon in place even when the page changes its own.
 (() => {
+  if (window.__tabkitRenamer) return;
+  window.__tabkitRenamer = true;
   let wantedTitle = null;
   let faviconSpec = null;
   let faviconUrl = null;

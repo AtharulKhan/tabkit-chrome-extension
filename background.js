@@ -387,7 +387,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case "discard-pass": { const n = await discardPass(); sendResponse({ ok: true, slept: n }); break; }
         case "rename-current": {
           const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (tab) await applyRename(tab, (msg.title || "").trim(), msg.favicon);
+          if (tab) {
+            await applyRename(tab, (msg.title || "").trim(), msg.favicon);
+            // Inject the renamer fresh so the new name and icon land even on a
+            // tab that was opened before the extension was (re)loaded.
+            try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["renamer.js"] }); } catch { /* page does not allow injection */ }
+          }
           sendResponse({ ok: true });
           break;
         }

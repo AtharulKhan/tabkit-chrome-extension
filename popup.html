@@ -26,8 +26,10 @@
   .footer button { font-size: 12px; }
   .icon-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .icon-label { font-size: 12px; color: var(--muted); font-weight: 650; }
-  .swatch { width: 20px; height: 20px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; box-shadow: none; }
-  .swatch.sel { border-color: var(--ink); }
+  #emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 8px; }
+  .emoji-btn { font-size: 17px; line-height: 1.25; padding: 4px 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; box-shadow: none; }
+  .emoji-btn:hover { border-color: var(--accent); }
+  .emoji-btn.sel { border-color: var(--accent); background: var(--accent-dark); }
 </style>
 </head>
 <body>
@@ -62,11 +64,11 @@
   </div>
   <div class="icon-row">
     <span class="icon-label">Icon</span>
-    <span id="swatches"></span>
-    <input type="text" id="favicon-emoji" placeholder="or emoji" maxlength="8" style="width:74px; flex:none">
+    <input type="text" id="favicon-emoji" placeholder="Paste any emoji" maxlength="8" style="width:120px; flex:none">
     <button class="link-btn" id="favicon-none">No icon</button>
   </div>
-  <p class="muted" style="margin:2px 0 0; font-size:12px">Colour makes a badge with the first letter of the title. Saved for this exact page, so each Google Sheet can look different.</p>
+  <div id="emoji-grid"></div>
+  <p class="muted" style="margin:2px 0 0; font-size:12px">Tap an emoji and it becomes this tab's icon right away. Saved for this exact page, so each Google Sheet can look different.</p>
 
   <div id="msg"></div>
 

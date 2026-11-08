@@ -116,64 +116,62 @@ $("save-set-btn").onclick = async () => {
   refreshSets();
 };
 
-const FAV_COLORS = ["#C15F3C", "#3E7C4F", "#2F5D8A", "#6B4E9E", "#B07D2B", "#2E7D74", "#A63A3A", "#6E6A5E"];
+const EMOJIS = ["📊", "📈", "💰", "🧾", "📋", "✅", "📅", "📧", "💬", "📞", "🛒", "🏦", "📁", "📝", "🔍", "⚙️", "🚀", "⭐", "🔥", "❤️", "🏠", "🎓", "📚", "🎵", "📷", "🌐", "💼", "🧠", "🤖", "🐛", "🔒", "⏰", "📌", "🗂️", "✈️", "🏥", "💊", "🏋️", "🍔", "☕", "🛠️", "📦", "🚗", "💡", "🎯", "📣", "👥", "🎨"];
 let selectedFavicon = null;
 
-function paintSwatches() {
-  const wrap = $("swatches");
-  wrap.innerHTML = "";
-  for (const color of FAV_COLORS) {
+function paintEmojiGrid() {
+  const grid = $("emoji-grid");
+  grid.innerHTML = "";
+  for (const e of EMOJIS) {
     const b = document.createElement("button");
-    b.className = "swatch" + (selectedFavicon && selectedFavicon.kind === "badge" && selectedFavicon.color === color ? " sel" : "");
-    b.style.background = color;
-    b.title = "Colour badge";
-    b.onclick = () => {
-      selectedFavicon = { kind: "badge", color };
-      $("favicon-emoji").value = "";
-      paintSwatches();
+    b.className = "emoji-btn" + (selectedFavicon && selectedFavicon.kind === "emoji" && selectedFavicon.value === e ? " sel" : "");
+    b.textContent = e;
+    b.onclick = async () => {
+      selectedFavicon = { kind: "emoji", value: e };
+      $("favicon-emoji").value = e;
+      paintEmojiGrid();
+      await saveRename();
     };
-    wrap.appendChild(b);
+    grid.appendChild(b);
   }
+}
+
+async function saveRename() {
+  const title = $("rename-input").value.trim();
+  await chrome.runtime.sendMessage({ type: "rename-current", title, favicon: selectedFavicon });
+  msg(title || selectedFavicon ? "Saved for this page. Name and icon stick on reload." : "Rename cleared.");
 }
 
 $("favicon-emoji").oninput = () => {
   const v = $("favicon-emoji").value.trim();
   selectedFavicon = v ? { kind: "emoji", value: v } : null;
-  if (v) paintSwatches();
+  paintEmojiGrid();
 };
 
-$("favicon-none").onclick = () => {
+$("favicon-none").onclick = async () => {
   selectedFavicon = null;
   $("favicon-emoji").value = "";
-  paintSwatches();
+  paintEmojiGrid();
+  await saveRename();
 };
 
-$("rename-save").onclick = async () => {
-  const title = $("rename-input").value.trim();
-  let favicon = selectedFavicon;
-  if (favicon && favicon.kind === "badge") {
-    const letter = (title.match(/[a-z0-9]/i) || ["?"])[0].toUpperCase();
-    favicon = { kind: "badge", color: favicon.color, letter };
-  }
-  await chrome.runtime.sendMessage({ type: "rename-current", title, favicon });
-  msg(title || favicon ? "Saved for this page. It will keep this name and icon on reload." : "Rename cleared.");
-};
+$("rename-save").onclick = saveRename;
 
 $("shortcut-change").onclick = () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
 
 (async () => {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (tab) $("rename-input").placeholder = tab.title || "New title for this tab";
-  paintSwatches();
+  paintEmojiGrid();
   if (tab && tab.url) {
     try {
       const rule = await chrome.runtime.sendMessage({ type: "get-rename", url: tab.url });
       if (rule) {
         if (rule.title) $("rename-input").value = rule.title;
-        if (rule.favicon) {
+        if (rule.favicon && rule.favicon.kind === "emoji") {
           selectedFavicon = rule.favicon;
-          if (rule.favicon.kind === "emoji") $("favicon-emoji").value = rule.favicon.value;
-          paintSwatches();
+          $("favicon-emoji").value = rule.favicon.value;
+          paintEmojiGrid();
         }
       }
     } catch { /* no rule yet */ }

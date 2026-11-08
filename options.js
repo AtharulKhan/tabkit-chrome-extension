@@ -111,18 +111,14 @@ $("rename-add").onclick = async () => {
   const pattern = $("rename-pattern").value.trim();
   const title = $("rename-title").value.trim();
   const emoji = $("rename-emoji").value.trim();
-  const color = $("rename-color").value;
-  if (!pattern || (!title && !emoji && !color)) { msg("A rename rule needs the site, plus a title or an icon."); return; }
+  if (!pattern || (!title && !emoji)) { msg("A rename rule needs the site, plus a title or an emoji icon."); return; }
   const match = pattern.includes("://") ? "exact" : "domain";
-  let favicon = null;
-  if (emoji) favicon = { kind: "emoji", value: emoji };
-  else if (color) favicon = { kind: "badge", color, letter: (title.match(/[a-z0-9]/i) || ["?"])[0].toUpperCase() };
   const rule = { id: uid(), match, pattern, title };
-  if (favicon) rule.favicon = favicon;
+  if (emoji) rule.favicon = { kind: "emoji", value: emoji };
   const renames = await getRenames();
   renames.unshift(rule);
   await saveRenames(renames);
-  $("rename-pattern").value = ""; $("rename-title").value = ""; $("rename-emoji").value = ""; $("rename-color").value = "";
+  $("rename-pattern").value = ""; $("rename-title").value = ""; $("rename-emoji").value = "";
   msg("Rename rule added.");
   renderRenames();
 };
