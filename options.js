@@ -1,4 +1,4 @@
-import { getSettings, saveSettings, getSets, saveSets, getRenames, saveRenames, uid } from "./store.js";
+import { getSettings, saveSettings, getSets, saveSets, getRenames, saveRenames, getQuickTabs, saveQuickTabs, uid } from "./store.js";
 
 const $ = (id) => document.getElementById(id);
 const msg = (t) => { $("msg").textContent = t || ""; };
@@ -142,7 +142,7 @@ $("save-all").onclick = async () => {
 };
 
 $("export-btn").onclick = async () => {
-  const data = await chrome.storage.local.get(["settings", "sets", "renames"]);
+  const data = await chrome.storage.local.get(["settings", "sets", "renames", "quickTabs"]);
   const backup = {
     app: "TabKit",
     backupVersion: 1,
@@ -150,6 +150,7 @@ $("export-btn").onclick = async () => {
     settings: data.settings || {},
     sets: data.sets || [],
     renames: data.renames || [],
+    quickTabs: data.quickTabs || [],
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
@@ -157,7 +158,7 @@ $("export-btn").onclick = async () => {
   a.download = "tabkit-setup.json";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  msg("Setup exported: settings, sets, and rename rules in one file.");
+  msg("Setup exported: settings, sets, rename rules with their icons, and quick tabs in one file.");
 };
 
 $("import-btn").onclick = () => $("import-file").click();
@@ -170,7 +171,8 @@ $("import-file").addEventListener("change", async (e) => {
     if (parsed.settings) await saveSettings(parsed.settings);
     if (Array.isArray(parsed.sets)) await saveSets(parsed.sets);
     if (Array.isArray(parsed.renames)) await saveRenames(parsed.renames);
-    msg("Setup imported. This browser now matches the file.");
+    if (Array.isArray(parsed.quickTabs)) await saveQuickTabs(parsed.quickTabs);
+    msg("Setup imported. This browser now matches the file, icons included.");
     await loadSettings();
     await renderSets();
     await renderRenames();
